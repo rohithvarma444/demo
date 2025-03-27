@@ -1,4 +1,4 @@
-Flask==3.0.0
+numpy<2.0
 cohere==4.40
 chromadb==0.4.24
 pypdf==4.2.0
