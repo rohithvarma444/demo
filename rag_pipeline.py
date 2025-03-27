@@ -1,4 +1,4 @@
-from flask import Flask, request, send_file
+from flask import Flask, request, send_file, jsonify
 import os
 import cohere
 import chromadb
@@ -9,7 +9,6 @@ from datetime import datetime
 COHERE_API_KEY = "vh3vmoDfDG8lsfbEIqOUbzOOIxinnD6YbvDukaHc"
 CHROMA_DB_PATH = "./chroma_db"
 UPLOAD_FOLDER = "./uploads"
-PDF_NAME = "SRS.pdf"  # Fixed PDF name
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -37,7 +36,8 @@ def store_text_in_chroma(text):
     """ Stores PDF text as embeddings in ChromaDB """
     chunks = [text[i:i + 512] for i in range(0, len(text), 512)]
 
-    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')  # Unique timestamp
+    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+    
     for i, chunk in enumerate(chunks):
         embedding = cohere_client.embed(
             texts=[chunk],
@@ -45,11 +45,10 @@ def store_text_in_chroma(text):
             input_type="search_document"
         ).embeddings[0]
 
-        # Store with unique ID
         collection.add(
-            ids=[f"SRS_{timestamp}_{i}"],
+            ids=[f"doc_{timestamp}_{i}"],
             embeddings=[embedding],
-            metadatas=[{"content": chunk, "pdf": PDF_NAME}]
+            metadatas=[{"content": chunk}]
         )
 
 
@@ -69,7 +68,6 @@ def retrieve_relevant_text(query):
     if 'metadatas' not in results or not results['metadatas']:
         return ["No relevant content found."]
 
-    # Extracting content properly from results
     return [meta['content'] for meta in results['metadatas'][0]]
 
 
@@ -91,37 +89,32 @@ def generate_response(query, context):
 @app.route('/', methods=['GET', 'POST'])
 def index():
     response = ""
+    pdf_name = "SRS.pdf"
+    pdf_path = os.path.join(app.config['UPLOAD_FOLDER'], pdf_name)
 
-    # Process the SRS.pdf file by default
-    pdf_path = os.path.join(app.config['UPLOAD_FOLDER'], PDF_NAME)
-    
-    if not os.path.exists(pdf_path):
-        return "SRS.pdf not found in the uploads directory."
+    # Ensure the uploads folder exists
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-    # Store SRS.pdf content in ChromaDB
-    document_text = extract_text_from_pdf(pdf_path)
-    store_text_in_chroma(document_text)
-
+    # Process the PDF upload and store in ChromaDB
     if request.method == 'POST':
+        if 'pdf_file' in request.files:
+            file = request.files['pdf_file']
+            if file.filename != '':
+                pdf_name = "SRS.pdf"  # Always save as SRS.pdf
+                pdf_path = os.path.join(app.config['UPLOAD_FOLDER'], pdf_name)
+                file.save(pdf_path)
+
+                document_text = extract_text_from_pdf(pdf_path)
+                store_text_in_chroma(document_text)
+
+        # Handle query
         query = request.form.get('query')
         if query:
             relevant_text = retrieve_relevant_text(query)
             context = " ".join(relevant_text)
             response = generate_response(query, context)
 
-    # Example questions in Telugu, English, Hindi, and Malayalam
-    example_questions = [
-        ("Telugu", "ఈ డాక్యుమెంట్‌లో ప్రాజెక్ట్ లక్ష్యాలు ఏమిటి?"),
-        ("English", "What are the project objectives mentioned in this document?"),
-        ("Hindi", "इस दस्तावेज़ में परियोजना के उद्देश्य क्या हैं?"),
-        ("Malayalam", "ഈ പ്രോജക്ട് ഡോക്യുമെന്റിലെ ഉദ്ദേശ്യങ്ങൾ എന്തൊക്കെയാണു?")
-    ]
-
     # HTML and CSS combined
-    examples_html = "".join(
-        f"<li><b>{lang}:</b> {question}</li>" for lang, question in example_questions
-    )
-
     return f"""
     <!DOCTYPE html>
     <html lang="en">
@@ -183,33 +176,27 @@ def index():
                 overflow-y: auto;
                 text-align: left;
             }}
-            ul {{
-                list-style-type: none;
-                padding: 0;
-            }}
-            li {{
-                font-size: 16px;
-                margin: 10px 0;
-            }}
         </style>
     </head>
     <body>
         <div class="container">
             <h1>PDF Q&A System</h1>
-            
-            <h2>Example Questions in Multiple Languages:</h2>
-            <ul>{examples_html}</ul>
+
+            <form method="POST" enctype="multipart/form-data">
+                <input type="file" name="pdf_file" accept=".pdf" required>
+                <button type="submit">Upload and Process PDF</button>
+            </form>
 
             <form method="POST">
                 <input type="text" name="query" placeholder="Ask a question..." required>
                 <button type="submit">Ask</button>
             </form>
 
+            <h2>Current PDF:</h2>
+            <a href="/pdf">📄 View SRS.pdf</a>
+
             <h2>Answer:</h2>
             <pre>{response}</pre>
-
-            <h2>View PDF:</h2>
-            <a href="/pdf">📄 View SRS.pdf</a>
         </div>
     </body>
     </html>
@@ -218,13 +205,13 @@ def index():
 
 @app.route('/pdf')
 def view_pdf():
-    """ Serve the SRS.pdf for viewing """
-    pdf_path = os.path.join(app.config['UPLOAD_FOLDER'], PDF_NAME)
+    """ Serve the SRS PDF for viewing """
+    pdf_path = os.path.join(app.config['UPLOAD_FOLDER'], "SRS.pdf")
 
     if os.path.exists(pdf_path):
         return send_file(pdf_path)
     else:
-        return "SRS.pdf not found.", 404
+        return "No PDF uploaded yet.", 404
 
 
 # -------------------- RUN FLASK --------------------
