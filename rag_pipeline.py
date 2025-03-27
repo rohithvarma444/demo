@@ -6,7 +6,7 @@ from pypdf import PdfReader
 from datetime import datetime
 
 # -------------------- CONFIGURATION --------------------
-COHERE_API_KEY = "JILSfTRUoBea6DuyPJWCdKyVOz4EzIMuQRyXT8HV"
+COHERE_API_KEY = "rV9UT11Rh4fMDVZrQzwCRwIeGCy6ywrXhXV0BHBt"
 CHROMA_DB_PATH = "./chroma_db"
 UPLOAD_FOLDER = "./uploads"
 PDF_NAME = "SRS.pdf"  # Fixed PDF name
