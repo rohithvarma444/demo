@@ -2,4 +2,4 @@ numpy<2.0
 cohere==4.40
 chromadb==0.4.24
 pypdf==4.2.0
-
+flask
