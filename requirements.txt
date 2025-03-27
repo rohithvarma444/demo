@@ -1,5 +1,6 @@
-numpy<2.0
+Flask==3.0.0
 cohere==4.40
 chromadb==0.4.24
 pypdf==4.2.0
-flask
+numpy<2.0
+gunicorn==21.2.0  # For production server

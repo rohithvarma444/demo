@@ -198,5 +198,7 @@ def view_pdf():
 
 
 # -------------------- RUN FLASK --------------------
+# For production, bind to 0.0.0.0 and use environment variable PORT or fallback to 10000
 if __name__ == '__main__':
-    app.run(debug=True)
+    PORT = int(os.getenv("PORT", 10000))
+    app.run(host='0.0.0.0', port=PORT, debug=True)
